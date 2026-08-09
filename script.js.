@@ -1,87 +1,210 @@
-const listenBtn = document.getElementById('listenBtn');
-const outputDiv = document.getElementById('output');
-let recognition;
+// Путь к приложениям на вашем компьютере (Windows)
+const telegramPath = "C:/Users/имя_пользователя/AppData/Roaming/Telegram Desktop/Telegram.exe";
+const vkMusicPath = "C:/Program Files/VK/VKMusic/vkmusic.exe"; // Или путь до ярлыка
+const yandexBrowserPath = "C:/Program Files/Yandex/YandexBrowser/application/browser.exe";
 
-// Проверяем, поддерживает ли браузер распознавание речи
-if (!('webkitSpeechRecognition' in window)) {
-    outputDiv.innerText = "Ваш браузер не поддерживает распознавание речи. Попробуйте Chrome.";
-    listenBtn.disabled = true;
-} else {
-    // Инициализация движка (используем префикс webkit для совместимости)
-    recognition = new webkitSpeechRecognition();
-    
-    recognition.lang = 'ru-RU'; // Язык
-    recognition.interimResults = false; // Показывать только готовый результат
-    recognition.continuous = false; // Слушать одну фразу и останавливаться
+// API-ключи для работы с внешними сервисами
+const weatherApiKey = 'YOUR_API_KEY'; // Получите бесплатно здесь: https://openweathermap.org/api
+const wikiApiUrl = 'https://en.wikipedia.org/w/api.php';
 
-    // Когда речь распознана
-    recognition.onresult = function(event) {
-        const command = event.results[0][0].transcript.trim().toLowerCase();
-        outputDiv.innerText = `Вы сказали: "${command}"`;
-        
-        executeCommand(command);
-    };
+// Настройки голоса (изменяйте по желанию)
+let voiceName = 'Microsoft Irina Desktop - Russian'; // Имя голосового движка
+let speechRate = 1; // Скорость речи (от 0.1 до 10)
+let speechPitch = 1; // Тембр (от 0 до 2)
 
-    // Ошибки
-    recognition.onerror = function(event) {
-        console.error("Ошибка:", event.error);
-        outputDiv.innerText = `Произошла ошибка: ${event.error}`;
-    };
-}
-
-// Переключение кнопки
-listenBtn.addEventListener('click', () => {
-    if (!recognition) return;
-    
-    listenBtn.classList.add('active');
-    listenBtn.textContent = "🔴 Слушаю...";
-    outputDiv.innerText = "Говорите...";
-    
-    recognition.start();
-});
-
-// Автоматически возвращаем кнопку в исходное состояние после остановки
-recognition.onend = () => {
-    listenBtn.classList.remove('active');
-    listenBtn.textContent = "🎤 Нажми и говори";
-};
-
-function executeCommand(command) {
-    speak(`Вы сказали: ${command}`); // Озвучиваем то, что услышали
-
-    if (command.includes("открой хром") || command.includes("запусти браузер")) {
-        window.open("https://google.com", "_blank");
-        speak("Запускаю браузер");
-    } else if (command.includes("ютуб") || command.includes("youtube")) {
-        window.open("https://youtube.com", "_blank");
-        speak("Открываю YouTube");
-    } else if (command.includes("который час") || command.includes("сколько времени")) {
-        const now = new Date();
-        const timeString = now.toLocaleTimeString('ru-RU');
-        speak(`Сейчас ${timeString}`);
-    } else if (command.includes("выключись") || command.includes("стоп")) {
-        speak("До встречи!");
-        // В браузере нельзя просто закрыть вкладку без подтверждения пользователя из соображений безопасности
-    } else {
-        speak("Простите, эту команду я выполнить не могу.");
-    }
-}
-
-// Функция синтеза речи (говорить)
+// Инициализация синтеза речи
 function speak(text) {
+    const synth = window.speechSynthesis;
+    if (!synth.getVoices().length) return false;
+    
+    let voices = synth.getVoices();
+    let selectedVoice = voices.find(v => v.name === voiceName);
+
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ru-RU';
-    
-    // Попытка выбрать русский голос
-    const voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith('ru'));
-    if (voices.length > 0) {
-        utterance.voice = voices[0];
-    }
-    
-    speechSynthesis.speak(utterance);
+    utterance.voice = selectedVoice || voices[0];
+    utterance.rate = speechRate;
+    utterance.pitch = speechPitch;
+
+    synth.speak(utterance);
 }
 
-// Загрузка списка голосов (иногда они подгружаются с задержкой)
-window.speechSynthesis.onvoiceschanged = () => {
-    // Можно предзагрузить голоса здесь при необходимости
-};
+// Функция распознавания речи
+async function recognizeSpeech() {
+    try {
+        const recognition = new webkitSpeechRecognition(); // Используем веб-версию
+        recognition.lang = 'ru-RU';
+        
+        // Показываем статус
+        document.querySelector('.speech-bubble').innerText = 'Говорите...';
+        document.body.classList.add('listening');
+
+        recognition.start();
+
+        recognition.onresult = async event => {
+            const command = event.results[0][0].transcript.trim().toLowerCase();
+            await handleCommand(command); // Отправляем команду на обработку
+        };
+
+        recognition.onend = () => {
+            document.body.classList.remove('listening'); // Снимаем класс прослушки
+        };
+    } catch (e) {
+        console.error(e);
+        alert('Ошибка микрофона. Проверьте настройки браузера.');
+    }
+}
+
+// Основная функция обработки всех команд
+async function handleCommand(command) {
+    // Приветствие
+    switch(true) {
+        case /^привет|здравствуй|добрый день/.test(command):
+            speak("Приветствую вас!");
+            break;
+
+        case /^(как дела|как поживаешь)/i.test(command):
+            speak("У меня всё отлично! Готов помочь вам.");
+            break;
+
+        case /(спасибо|благодарю)/i.test(command):
+            speak("Всегда пожалуйста!");
+            break;
+
+        case /^(до свидания|пока|всего хорошего)/i.test(command):
+            speak("До встречи! Хорошего дня.");
+            break;
+
+        // Комплименты
+        case /бот/i.test(command):
+            speak("Спасибо за добрые слова! Я всего лишь программа, но стараюсь быть полезной.");
+            break;
+
+        case /самый лучший/i.test(command):
+            speak("Вы очень добры! Но я просто ваш верный помощник.");
+            break;
+
+        // Работа с датой и временем
+        case /^(сколько времени|который час)/i.test(command):
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            speak(`Сейчас ${hours}:${minutes}`);
+            break;
+
+        case /^(какая дата|сегодня какой день)/i.test(command):
+            const today = new Intl.DateTimeFormat('ru', { dateStyle: 'full' }).format(new Date());
+            speak(today);
+            break;
+
+        // Погода (нужно получить свой ключ выше!)
+        case /погода/i.test(command):
+            if (!weatherApiKey) {
+                speak('Не могу проверить погоду без ключа OpenWeatherMap.');
+                return;
+            }
+
+            const city = 'Москва'; // Можно менять город
+            const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&lang=ru&appid=${weatherApiKey}`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.cod !== 200) {
+                speak('К сожалению, возникли проблемы при получении данных о погоде.');
+                return;
+            }
+
+            const temp = Math.round(data.main.temp);
+            const description = data.weather[0].description;
+            speak(`В ${city} сейчас ${temp} градусов Цельсия, ${description}.`);
+            break;
+
+        // Случайная шутка (на английском)
+        case /шутка/i.test(command):
+            const jokeResponse = await fetch('https://official-joke-api.appspot.com/jokes/random');
+            const joke = await jokeResponse.json();
+            speak(joke.setup + '. ' + joke.punchline);
+            break;
+
+        // Случайный факт из Википедии (на английском)
+        case /факт/i.test(command):
+            const params = new URLSearchParams({
+                action: 'query',
+                format: 'json',
+                generator: 'random',
+                grnnamespace: 0,
+                prop: 'extracts',
+                exintro: true,
+                exhplaintext: true,
+                origin: '*'
+            });
+
+            const factResponse = await fetch(`${wikiApiUrl}?${params}`);
+            const factData = await factResponse.json();
+            const extract = factData?.query?.pages[Object.keys(factData.query.pages)[0]]?.extract;
+
+            if (extract) {
+                speak(extract.split('\n')[0]); // Читаем только первое предложение
+            } else {
+                speak('Ой, что-то пошло не так. Попробуйте ещё раз!');
+            }
+            break;
+
+        // Сайты
+        case /открыть ютуб|youtube/i.test(command):
+            window.open("https://www.youtube.com");
+            speak("Запускаю YouTube");
+            break;
+
+        case /открыть вк|вконтакте/i.test(command):
+            window.open("https://vk.com");
+            speak("Открываю ВКонтакте");
+            break;
+
+        case /музыка|ютуб музыка/i.test(command):
+            window.open("https://music.youtube.com");
+            speak("Открываю YouTube Music");
+            break;
+
+        case /яндекс музыка/i.test(command):
+            window.open("https://music.yandex.ru/home");
+            speak("Открываю Яндекс Музыку");
+            break;
+
+        case /телеграм/i.test(command):
+            window.open("https://web.telegram.org/k/");
+            speak("Открываю Телеграм Веб");
+            break;
+
+        case /нетфликс/i.test(command):
+            window.open("https://netflix.com");
+            speak("Открываю Нетфликс");
+            break;
+
+        case /спотифай/i.test(command):
+            window.open("https://open.spotify.com");
+            speak("Открываю Спотифай");
+            break;
+
+        // Приложения (запускаются только на ПК, где открыт сайт)
+        case /открой телеграм/i.test(command):
+            require('child_process').execFile(telegramPath);
+            speak("Запускаю Телеграм");
+            break;
+
+        case /открой vk музыку/i.test(command):
+            require('child_process').execFile(vkMusicPath);
+            speak("Запускаю VK Музыку");
+            break;
+
+        case /открой браузер/i.test(command):
+            require('child_process').execFile(yandexBrowserPath);
+            speak("Запускаю Яндекс.Браузер");
+            break;
+
+        default:
+            speak('Извините, команда не распознанa.');
+    }
+}
+
+document.querySelector('#start-btn').addEventListener('click', recognizeSpeech);
