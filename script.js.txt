@@ -1,0 +1,87 @@
+const listenBtn = document.getElementById('listenBtn');
+const outputDiv = document.getElementById('output');
+let recognition;
+
+// Проверяем, поддерживает ли браузер распознавание речи
+if (!('webkitSpeechRecognition' in window)) {
+    outputDiv.innerText = "Ваш браузер не поддерживает распознавание речи. Попробуйте Chrome.";
+    listenBtn.disabled = true;
+} else {
+    // Инициализация движка (используем префикс webkit для совместимости)
+    recognition = new webkitSpeechRecognition();
+    
+    recognition.lang = 'ru-RU'; // Язык
+    recognition.interimResults = false; // Показывать только готовый результат
+    recognition.continuous = false; // Слушать одну фразу и останавливаться
+
+    // Когда речь распознана
+    recognition.onresult = function(event) {
+        const command = event.results[0][0].transcript.trim().toLowerCase();
+        outputDiv.innerText = `Вы сказали: "${command}"`;
+        
+        executeCommand(command);
+    };
+
+    // Ошибки
+    recognition.onerror = function(event) {
+        console.error("Ошибка:", event.error);
+        outputDiv.innerText = `Произошла ошибка: ${event.error}`;
+    };
+}
+
+// Переключение кнопки
+listenBtn.addEventListener('click', () => {
+    if (!recognition) return;
+    
+    listenBtn.classList.add('active');
+    listenBtn.textContent = "🔴 Слушаю...";
+    outputDiv.innerText = "Говорите...";
+    
+    recognition.start();
+});
+
+// Автоматически возвращаем кнопку в исходное состояние после остановки
+recognition.onend = () => {
+    listenBtn.classList.remove('active');
+    listenBtn.textContent = "🎤 Нажми и говори";
+};
+
+function executeCommand(command) {
+    speak(`Вы сказали: ${command}`); // Озвучиваем то, что услышали
+
+    if (command.includes("открой хром") || command.includes("запусти браузер")) {
+        window.open("https://google.com", "_blank");
+        speak("Запускаю браузер");
+    } else if (command.includes("ютуб") || command.includes("youtube")) {
+        window.open("https://youtube.com", "_blank");
+        speak("Открываю YouTube");
+    } else if (command.includes("который час") || command.includes("сколько времени")) {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('ru-RU');
+        speak(`Сейчас ${timeString}`);
+    } else if (command.includes("выключись") || command.includes("стоп")) {
+        speak("До встречи!");
+        // В браузере нельзя просто закрыть вкладку без подтверждения пользователя из соображений безопасности
+    } else {
+        speak("Простите, эту команду я выполнить не могу.");
+    }
+}
+
+// Функция синтеза речи (говорить)
+function speak(text) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ru-RU';
+    
+    // Попытка выбрать русский голос
+    const voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith('ru'));
+    if (voices.length > 0) {
+        utterance.voice = voices[0];
+    }
+    
+    speechSynthesis.speak(utterance);
+}
+
+// Загрузка списка голосов (иногда они подгружаются с задержкой)
+window.speechSynthesis.onvoiceschanged = () => {
+    // Можно предзагрузить голоса здесь при необходимости
+};

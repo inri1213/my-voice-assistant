@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Голосовой Помощник</title>
+    
+    <!-- Подключаем Google Fonts для красивых шрифтов -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --primary-color: #22d3ee;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Анимированный фон (эффект космоса) */
+        body::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at center, rgba(34, 211, 238, 0.05) 0%, transparent 70%);
+            animation: rotate 20s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .container {
+            text-align: center;
+            background: var(--card-bg);
+            padding: 2rem 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(34, 211, 238, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 35px 60px -12px rgba(34, 211, 238, 0.15);
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        .listen-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            outline: none;
+            position: relative;
+            padding: 0;
+        }
+
+        .mic-icon {
+            width: 100px;
+            height: 100px;
+            fill: var(--primary-color);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Эффект нажатия на кнопку */
+        .listen-btn:active .mic-icon {
+            transform: scale(0.95);
+        }
+
+        /* Пульсация при записи */
+        .is-listening .mic-icon {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
+        }
+
+        /* Статус бар внизу */
+        .status-bar {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Ассистент</h1>
+        <p>Нажмите на микрофон, чтобы начать разговор.</p>
+        
+        <button id="assistantBtn" class="listen-btn" aria-label="Запустить голосового помощника">
+            <!-- SVG Иконка Микрофона -->
+            <svg class="mic-icon" viewBox="0 0 24 24">
+                <path d="M12 14A4 4 0 0 1 8 10V7A6 6 0 0 0 12 5A6 6 0 0 0 16 7v3a4 4 0 0 1-4 4m7-9v2a4 4 0 0 1-4 4H5a4 4 0 0 1-4-4V5a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4"/>
+            </svg>
+        </button>
+
+        <div id="status" class="status-bar">Готов к работе...</div>
+    </div>
+
+    <script>
+        const btn = document.getElementById('assistantBtn');
+        const statusDiv = document.getElementById('status');
+        let recognition;
+
+        // Проверка поддержки Speech API
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            
+            recognition.lang = 'ru-RU';
+            recognition.interimResults = false;
+
+            recognition.onstart = () => {
+                console.log("Распознавание начато...");
+                btn.classList.add('is-listening');
+                statusDiv.textContent = "🎤 Слушаю вас...";
+            };
+
+            recognition.onresult = (event) => {
+                const command = event.results[0][0].transcript.trim().toLowerCase();
+                handleCommand(command);
+            };
+
+            recognition.onerror = (event) => {
+                console.error(event.error);
+                statusDiv.textContent = `Ошибка: ${event.error}`;
+            };
+
+            recognition.onend = () => {
+                btn.classList.remove('is-listening');
+                statusDiv.textContent = "Готов к работе...";
+            };
+
+            btn.addEventListener('click', () => {
+                try {
+                    recognition.start();
+                } catch (e) {
+                    statusDiv.textContent = "Не удалось получить доступ к микрофону.";
+                }
+            });
+        } else {
+            statusDiv.textContent = "Ваш браузер не поддерживает распознавание речи. Используйте Chrome/Edge.";
+            btn.style.opacity = "0.5";
+            btn.style.cursor = "not-allowed";
+        }
+
+        function handleCommand(command) {
+            statusDiv.textContent = `Вы сказали: "${command}"`;
+            speak(`Вы попросили: ${command}`);
+
+            switch (true) {
+                case /открой хром|запусти браузер/.test(command):
+                    window.open("https://google.com", "_blank");
+                    speak("Открываю Гугл Хром");
+                    break;
+                case /ютуб|youtube/.test(command):
+                    window.open("https://youtube.com", "_blank");
+                    speak("Включаю Ютуб");
+                    break;
+                case /который час|сколько времени/.test(command):
+                    const now = new Date();
+                    const timeString = now.toLocaleTimeString('ru-RU');
+                    speak(`Сейчас ${timeString}`);
+                    break;
+                case /выключись|стоп|пока/.test(command):
+                    speak("До встречи!");
+                    break;
+                default:
+                    speak("Простите, я пока не знаю такой команды.");
+            }
+        }
+
+        function speak(text) {
+            speechSynthesis.cancel(); // Прерываем предыдущее сообщение
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'ru-RU';
+            
+            // Поиск русского голоса
+            const voices = window.speechSynthesis.getVoices().filter(v => v.lang.startsWith('ru'));
+            if (voices.length > 0) {
+                utterance.voice = voices[0];
+            }
+            
+            window.speechSynthesis.speak(utterance);
+        }
+    </script>
+</body>
+</html>
